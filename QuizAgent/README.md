@@ -1,5 +1,90 @@
 # Quiz Agent
-A proposed quiz generation and grading agent for network security course. This document covers the interfaces, workflows, security boundaries, and integration decisions described in the preliminary design.
+The Quiz Agent will generate and grade quizzes using our local Network Security course materials. It supports random and topic-specific quizzes with multiple-choice, true/false, and open-ended questions. This README describes the current code structure and how we plan to connect it to the backend, RAG, and shared LLM.
+
+## Current code
+
+Only the basic Python structure is in place. Generation and grading still raise
+`NotImplementedError`, and no RAG or LLM connection has been implemented. There
+are no third-party Python dependencies yet.
+
+`models.py` contains the initial data types. The JSON examples later in this file
+are design sketches, not exact representations of those classes or finished API
+responses. We still need to agree on the final formats with the backend developer.
+
+```text
+QuizAgent/
+├── __init__.py      # Exports QuizAgent
+├── agent.py         # Backend entry points: generate() and grade()
+├── models.py        # Internal requests, evidence, private drafts and results
+├── interfaces.py    # Contracts for shared RAG and local LLM clients
+├── generation.py    # Question-generation workflow placeholder
+├── grading.py       # Answer-evaluation workflow placeholder
+└── README.md
+```
+
+### How the components connect
+
+```text
+Backend routes → QuizAgent → generation / grading
+                                  ├── RagClient → shared retrieval service
+                                  └── LlmClient ─┐
+Q&A Agent → its own prompts → LlmClient ──────────┴→ shared local LLM runtime
+```
+
+The backend creates a `QuizAgent` and passes it the RAG and LLM clients:
+
+```python
+from QuizAgent import QuizAgent
+from QuizAgent.models import AuthorizedScope, QuizRequest
+
+# Example only: the shared clients still need to be implemented.
+quiz_agent = QuizAgent(rag=shared_rag, llm=shared_llm)
+
+# Inside an authenticated async handler, after request validation:
+request = QuizRequest(
+    course_id="CS5342",
+    mode="topic",
+    topic_id="firewall",
+    question_counts={"multiple_choice": 3, "true_false": 2, "open_ended": 1},
+)
+scope = AuthorizedScope(course_ids=authorized_course_ids)  # From backend auth.
+draft = await quiz_agent.generate(request, scope=scope)  # Not implemented yet.
+# Backend assigns IDs, stores the private draft, and returns public questions only.
+```
+
+- **Backend:** checks user access, validates requests, assigns IDs, and stores quiz
+  keys and results. It builds the grading request from saved records. The browser
+  sends only the attempt ID and student answers.
+- **Quiz Agent:** builds prompts, generates questions, checks model output, grades
+  answers, and returns feedback.
+- **Shared RAG:** retrieves allowed course material, selects topics for random
+  quizzes, and keeps source information and document versions. The current scope
+  lists allowed courses. Private user uploads would need additional access checks.
+- **Shared LLM client:** connects to the local model and handles configuration,
+  timeouts, and limits on simultaneous requests. Both agents can use the same
+  runtime while keeping their prompts and conversation data separate.
+
+The RAG and LLM implementations should live in the shared part of the project.
+When we connect both agents, the common LLM interface should move there too, so
+the Q&A Agent does not have to import from `QuizAgent`. The Quiz Agent will use
+these services rather than start its own model or manage the vector database.
+
+### Details to agree on before integration
+
+- Use stable MCQ option IDs (`"A"`, `"B"`, etc.), Boolean true/false answers and
+  string open-ended answers. Adapt the frontend's current numeric MCQ indexes.
+- Preserve chunk IDs, source locations and corpus versions for citations and grading.
+- Implement separate public question and post-submission result schemas in the
+  backend. Never serialize `QuestionDraft` directly into a pre-submission response.
+- Dataclasses and type hints do not validate runtime data. Add explicit validation
+  before these contracts process browser input or model output. The dictionaries
+  within frozen dataclasses are also mutable; these objects are not storage locks.
+- Define failure responses for insufficient evidence, unavailable source versions,
+  model timeouts and invalid model output before connecting the frontend.
+
+The next step is to add input/output checks and MCQ/true-false grading. We can
+use fake RAG and LLM clients to test the flow while the shared services are being
+built, then add question generation and rubric-based grading.
 
 ## Contents
 
@@ -13,11 +98,9 @@ A proposed quiz generation and grading agent for network security course. This d
 
 ## 1. Overview
 
-The Quiz agent is responsible for:
-- generate/grade network security quizzes using information retrieved from the local course knowledge base
-- supports two quiz generation modes: random questions and topic-specific questions
-- each quiz may contain multiple-choice, true/false, and open-ended questions
-- the agent evaluates student answers and generates feedback supported by citations from course materials or approved external documentation.
+A student chooses a random quiz or a topic, answers the questions, and receives
+a score with explanations and citations. Questions and feedback should use the
+local course knowledge base, including any approved external documents added to it.
 
 **General communication flow:**
 
@@ -27,7 +110,10 @@ Frontend → Backend → (Quiz Agent ↔ RAG / Local LLM) → Backend → Fronte
 
 ## 2. Backend ↔ Quiz Agent Interface
 
-The backend acts as the primary controller of the Quiz Agent. It validates requests, enforces user permissions, manages quiz attempts, stores answer keys, and returns authorized results to the frontend. The Quiz agent exposes two main operations: quiz generation and quiz grading.
+The backend calls `generate()` and `grade()`. It checks permissions, manages quiz
+attempts, and stores answer keys. The Quiz Agent returns its results to the
+backend, which decides what can be sent to the frontend.
+
 ### 2.1 Quiz Generation
 
 **Process:** Backend receives quiz request → validates settings and permissions → Quiz Agent retrieves approved evidence → generates questions and internal answer keys → validates questions and citations → backend stores private quiz data → returns sanitized questions to frontend.
@@ -56,7 +142,8 @@ The request identifies the course, quiz mode, optional topic, and number of ques
 
 **Response from Quiz Agent to Backend**
 
-The Quiz Agent returns an internal quiz draft containing generated questions, proposed correct answers, grading rubrics, explanations, and supporting evidence references. The following abbreviated example illustrates the private response structure:
+The agent returns a private draft with questions, answer keys, rubrics,
+explanations, and evidence references. This example shows one MCQ:
 
 ```json
 {
@@ -84,15 +171,19 @@ The Quiz Agent returns an internal quiz draft containing generated questions, pr
 The example shows one question for readability; the complete response must satisfy the requested question counts.
 For true/false questions, the answer key contains a Boolean value. For open-ended questions, it contains a reference answer and a rubric specifying grading criteria and maximum points.
 
-**Security consideration:** This response is private and must not be passed directly to the frontend.
+**Do not send this draft directly to the frontend. It contains the answers.**
 
-The backend assigns authoritative quiz, question, and attempt IDs. It stores the answer keys and rubrics in protected local storage and constructs a separate public response containing only question identifiers, text, and answer options.
+The backend assigns quiz, question, and attempt IDs, then stores the keys and
+rubrics locally. Before submission, the frontend receives only the question IDs,
+text, and answer options.
 
 ### 2.2 Submission and Grading
 
 **Process:** Student submits answers → backend validates attempt ownership and state → retrieves locked answer keys and rubrics → Quiz Agent grades answers → validates grading output → backend commits the final grade → returns feedback and citations.
 
-The frontend initially submits an attempt ID and student answers. The backend then constructs an internal grading request containing the necessary private assessment information.
+The frontend submits an attempt ID and the student’s answers. The backend checks
+that the attempt belongs to that student and can still be submitted, then loads
+the saved keys and rubrics to build the grading request.
 
 **Request from Backend to Quiz Agent**
 
@@ -132,10 +223,13 @@ The frontend initially submits an attempt ID and student answers. The backend th
 }
 ```
 
-The Quiz Agent uses different grading methods depending on the question type:
+Grading depends on the question type:
+
 - Multiple choice and true/false: Deterministic Python comparison against the stored answer key.
 - Open-ended: Local LLM evaluation against a predefined, locked rubric and supporting source material.
-The LLM is only used where semantic assessment is required. This reduces unnecessary inference overhead and grading inconsistency.
+
+MCQ and true/false answers do not need a model call. Open-ended answers need
+rubric-based evaluation, including partial credit.
 
 **Response from Quiz Agent to Backend**
 
@@ -166,7 +260,9 @@ The LLM is only used where semantic assessment is required. This reduces unneces
 }
 ```
 
-The backend verifies question IDs, rubric criteria, score limits, and result consistency before computing and committing the final score. Invalid or uncertain grading results should produce a controlled failure or review-required status.
+Before saving the final score, the backend checks question IDs, rubric criteria,
+and score limits. Invalid results should return an error; uncertain grades should
+be marked for review.
 
 ### 2.3 Division of Responsibilities
 
@@ -180,12 +276,14 @@ The backend verifies question IDs, rubric criteria, score limits, and result con
 | Final score computation and commit | Feedback and evidence references |
 | Frontend response filtering | Structured grading results |
 
-This separation ensures that the LLM does not directly manage security-sensitive operations such as changing student grades or accessing unrelated assessment records.
+The model proposes content and scores. Backend code controls access to records
+and saves the final grade.
 
 ## 3. Quiz Agent ↔ RAG Interface
 
-The Quiz Agent obtains knowledge through a restricted retrieval interface exposed by the shared RAG system. It should not directly access or modify the vector database.
-The RAG system is responsible for retrieving authorized, approved course material and returning the relevant source text with provenance metadata.
+The Quiz Agent asks the shared RAG system for course passages through `RagClient`.
+RAG checks which documents the user may access and returns the text with its source
+information. The agent does not read or change the vector database directly.
 
 ### 3.1 Evidence Retrieval for Quiz Generation
 
@@ -227,8 +325,8 @@ Example RAG response:
 }
 ```
 
-The exact source text is required because embeddings alone are insufficient for generating and verifying factual questions.
-The provenance fields allow the agent to associate each answer with a specific lecture slide, textbook page, or approved web document.
+The agent needs the passage text, not just its embedding, to write and check a
+question. Document IDs, page numbers, and URLs let us show where an answer came from.
 
 ### 3.2 Evidence Retrieval for Grading
 
@@ -243,23 +341,29 @@ get_evidence_by_ids(
 )
 ```
 
-This prevents grading from silently relying on different reference material if the knowledge base has changed after quiz generation.
-If the original evidence is unavailable, grading should fail safely rather than substitute unrelated evidence.
+Grading should use the same source version used to generate the question, even
+if the knowledge base has since changed. If that version is missing, return an
+error instead of substituting another passage.
 
 ### 3.3 RAG Security Requirements
 
-The shared retrieval layer should enforce the following:
+The shared retrieval layer needs to enforce these rules:
+
 - Only approved and authorized course documents may be retrieved.
 - Each evidence chunk must retain stable source and version information.
 - Retrieval results must be bounded in number and size.
 - The Quiz Agent must have read-only access to the knowledge base.
 - Retrieved material must be treated as untrusted data, not executable instructions.
-These protections are shared requirements for both the Q&A and Quiz agents, reducing duplicated implementation.
+
+Both agents rely on these checks in the shared retrieval layer.
 
 ## 4. Quiz Agent ↔ Local LLM Runtime Integration
 
-Both the Q&A Tutor and Quiz Agent may share one local LLM runtime, such as Ollama. The proposed architecture separates the LLM inference service from the agent-specific workflows. Sharing a runtime can reduce memory overhead and avoid unnecessarily loading separate copies of a model.
-The Quiz Agent uses two logically independent LLM tasks.
+The plan is to run one local model runtime, such as Ollama, for both agents. Each
+agent sends its own prompts through an LLM client. This avoids loading a separate
+copy of the model for each agent.
+
+The Quiz Agent has two model tasks:
 
 | Question Generator | Open-Ended Grader |
 | --- | --- |
@@ -272,7 +376,9 @@ Both workflows may call the same local model through separate prompts and struct
 
 **Proposed integration**
 
-The Quiz Agent should communicate with the LLM through a shared local inference client or model service.
+The following calls sketch the two tasks; prompt text and output schemas still
+need to be defined.
+
 For quiz generation:
 
 ```python
@@ -293,11 +399,17 @@ llm_client.generate_structured(
 )
 ```
 
-If Ollama is selected, its API supports JSON-schema-constrained responses. However, schema validation verifies data structure, not factual accuracy; generated questions and grades still require application-level checks. Sharing a model does not imply sharing permissions or agent state. Resource scheduling should be coordinated with the Q&A developer to prevent simultaneous workloads from exhausting local RAM or GPU capacity.
+We want structured model output so the agent can check required fields and score
+limits. A valid structure does not prove that an answer is correct; we still need
+to check it against the source material.
+
+We also need to agree with the Q&A developer on request limits. Sharing the model
+should not mean sharing conversation history, permissions, or private quiz data.
 
 ## 5. External Data → RAG Ingestion Pipeline
 
-The document ingestion pipeline could be shared by both agents, and the objective is to create a trustworthy local knowledge base from instructor-provided course material and approved official websites.
+Both agents will use the same document ingestion pipeline. It will process course
+files and approved website content before either agent retrieves them.
 
 **Proposed pipeline**
 
@@ -311,16 +423,20 @@ The document ingestion pipeline could be shared by both agents, and the objectiv
 
 **Design considerations for the ingestion pipeline**
 
-Uploaded and downloaded documents should initially be treated as untrusted. File validation and sandboxed extraction help contain parser vulnerabilities, while content approval reduces the possibility of incorrect or malicious material entering the knowledge base. Embedding generation, storage, and retrieval remain local. Internet access, if supported, is isolated within an optional restricted gateway rather than being available directly to either agent. For official websites, the original URL, document title, publisher, and retrieval timestamp should be retained for future citation verification.
+Files need validation before extraction, and extracted text needs review before
+indexing. Embeddings, stored documents, and retrieval stay local. Any internet
+downloads should go through the restricted gateway. For web sources, keep the URL,
+title, publisher, and retrieval date so citations can be checked later.
 
 ## 6. Quiz Agent Attack-Surface Analysis
 
-The preliminary threat model focuses on network, software, and human attack surfaces. The scope is intentionally limited to threats relevant to the assignment and the proposed Quiz Agent design.
-The primary protected assets are approved course materials, embeddings, source metadata, answer keys, grading rubrics, student answers, grades, model configuration, and system credentials.
+We need to protect course documents and embeddings, answer keys and rubrics,
+student answers and grades, and system credentials. The tables below list the
+risks we have identified and the controls we plan to add.
 
 ### 6.1 Network Attack Surface
 
-_Not yet detailed in this preliminary specification._
+TODO: document exposed endpoints, local service access, and external lookup traffic.
 
 ### 6.2 Software Attack Surface
 
@@ -343,14 +459,18 @@ _Not yet detailed in this preliminary specification._
 | Student | Generates excessive quizzes, exhausting resources | Maximum question counts, concurrency limits and timeouts |
 | Student | Attempts to manipulate grading through open-ended responses | Fixed rubrics, untrusted-input isolation and grade validation |
 
-The initial implementation does not aim to build an extensive student-monitoring or anti-cheating system. This would introduce additional complexity beyond the assignment requirements.
-Instead, the design focuses on enforcing a small number of predictable policies: restricted access, protected answer keys, bounded resource usage, and validation of grading results.
+For the first version, we will focus on access checks, keeping answer keys private,
+limiting resource use, and checking grades. Student monitoring and broader
+anti-cheating features are outside the current scope.
 
 ### 6.4 Overall Security Strategy
 
-The main security principle is that the LLM may generate and evaluate content, but it should not control authorization, database permissions, or authoritative grade commits. Security controls are enforced through trusted backend services, local process restrictions, approved RAG retrieval, and output validation.
+Access checks and grade storage belong in application code. A prompt must not be
+able to grant permissions, change a stored answer key, or save an unchecked grade.
+The model’s output needs validation before the backend uses it.
 
-Initial security testing should verify that:
+Initial security tests should check that:
+
 - Prompt injection cannot alter protected grading rules.
 - Answer keys are absent from pre-submission frontend responses.
 - Unauthorized users cannot access another student's attempts.
