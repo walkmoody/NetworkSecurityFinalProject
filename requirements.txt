@@ -1,0 +1,4 @@
+PyMuPDF
+chromadb
+sentence-transformers
+pytest
