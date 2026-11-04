@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 # project directories
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 MANIFEST_FILE = BASE_DIR / "hashes.json"
 

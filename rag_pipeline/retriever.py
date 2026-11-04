@@ -1,5 +1,5 @@
 
-from embeddings import (
+from rag_pipeline.embeddings import (
     load_embedding_model,
     get_collection,
     generate_embeddings

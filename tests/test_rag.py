@@ -10,9 +10,10 @@ sys.path.insert(
     str(Path(__file__).resolve().parents[1])
 )
 
-from integrity import calculate_hash
-from ingestion import clean_text, chunk_text
-from retriever import retrieve_documents
+from rag_pipeline.integrity import calculate_hash
+from rag_pipeline.ingestion import clean_text, chunk_text
+from rag_pipeline.retriever import retrieve_documents
+
 
 
 def test_sha256_hash(): # verify that identical file contents produce identical SHA-256 hashes.

@@ -1,5 +1,5 @@
-from integrity import verify_documents
-from embeddings import build_vector_database
+from rag_pipeline.integrity import verify_documents
+from rag_pipeline.embeddings import build_vector_database
 
 
 def main(): # verify documents and build the local knowledge base
