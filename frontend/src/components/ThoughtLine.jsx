@@ -28,6 +28,8 @@ export default function ThoughtLine({
   renderLabel,
   glyph = 'sparkle',
   steps = EMPTY_STEPS,
+  stepsDone,
+  wrapSteps = false,
   collapsible = true,
   collapseOnSettle = true,
   color = 'currentColor',
@@ -235,7 +237,7 @@ export default function ThoughtLine({
 
   return (
     <div
-      className={`group inline-flex flex-col items-start leading-[1.2] font-medium [color:var(--tl-color)] [font-family:inherit] [font-size:var(--tl-font)]${className ? ` ${className}` : ''}`}
+      className={`group ${wrapSteps ? 'flex w-full' : 'inline-flex'} flex-col items-start leading-[1.2] font-medium [color:var(--tl-color)] [font-family:inherit] [font-size:var(--tl-font)]${className ? ` ${className}` : ''}`}
       data-working={isWorking ? '' : undefined}
       data-open={open && hasTrace ? '' : undefined}
       style={{
@@ -274,14 +276,20 @@ export default function ThoughtLine({
           aria-hidden={!open}
         >
           <div className="min-h-0 overflow-x-visible overflow-y-clip">
-            <div className="flex w-max flex-col gap-[0.45em] pt-[0.6em] pb-[0.2em] pl-[1.6em] text-[0.875em] font-normal whitespace-nowrap">
+            <div
+              className={`flex flex-col gap-[0.45em] pt-[0.6em] pb-[0.2em] pl-[1.6em] text-[0.875em] font-normal ${
+                wrapSteps ? 'w-full whitespace-normal [overflow-wrap:anywhere]' : 'w-max whitespace-nowrap'
+              }`}
+            >
               {steps.map((text, i) => {
-                const done = !isWorking || i < steps.length - 1;
+                // stepsDone (optional) gives each step's real state; otherwise only the last step is active.
+                const done = !isWorking || (stepsDone ? stepsDone[i] : i < steps.length - 1);
                 return (
                   <div
                     key={`${i}-${text}`}
-                    className="group/step flex translate-y-0 items-center gap-[0.5em] opacity-100 [transition:opacity_200ms_cubic-bezier(0.23,1,0.32,1),transform_200ms_cubic-bezier(0.23,1,0.32,1)] starting:-translate-y-1 starting:opacity-0 motion-reduce:[transform:none]! motion-reduce:[transition:opacity_200ms_ease]"
+                    className="group/step flex translate-y-0 items-center gap-[0.5em] data-[wrap]:items-baseline opacity-100 [transition:opacity_200ms_cubic-bezier(0.23,1,0.32,1),transform_200ms_cubic-bezier(0.23,1,0.32,1)] starting:-translate-y-1 starting:opacity-0 motion-reduce:[transform:none]! motion-reduce:[transition:opacity_200ms_ease]"
                     data-done={done ? '' : undefined}
+                    data-wrap={wrapSteps ? '' : undefined}
                   >
                     <span
                       className="inline-grid h-[1em] w-[1em] flex-none place-items-center opacity-55"
