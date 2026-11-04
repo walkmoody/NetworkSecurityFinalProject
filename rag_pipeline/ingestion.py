@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pymupdf
 
-from integrity import DATA_DIR, get_documents, verify_documents
+from rag_pipeline.integrity import DATA_DIR, get_documents, verify_documents
 
 
 def extract_pdf(file_path):

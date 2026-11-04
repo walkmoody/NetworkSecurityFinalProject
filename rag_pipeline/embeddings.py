@@ -4,9 +4,9 @@ from pathlib import Path
 import chromadb
 from sentence_transformers import SentenceTransformer
 
-from ingestion import ingest_documents
+from rag_pipeline.ingestion import ingest_documents
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "vector_db"
 
 COLLECTION_NAME = "network_security"
