@@ -10,11 +10,8 @@ __pycache__/
 data/*
 !data/.gitkeep
 
-# Local vector database
+# Local vector database and its integrity manifest (vector_db/hashes.json)
 vector_db/
-
-# Integrity manifest
-hashes.json
 
 # Environment variables and secrets
 .env

@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+# FastAPI's TestClient, used by backend/tests
+httpx
+# rag_pipeline dependencies (chromadb, sentence-transformers, PyMuPDF)
+-r ../requirements.txt
