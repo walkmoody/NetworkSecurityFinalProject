@@ -108,6 +108,7 @@ def build_vector_database():
     metadata = [
         {
             "source": chunk["source"],
+            "course": chunk["course"],
             "page": chunk["page"],
             "chunk": chunk["chunk"]
         }

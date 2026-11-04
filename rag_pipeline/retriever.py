@@ -5,7 +5,7 @@ from rag_pipeline.embeddings import (
     generate_embeddings
 )
 
-def retrieve_documents(query, top_k=3): # retrieve the most relevant document chunks from the local ChromaDB vector database
+def retrieve_documents(query, top_k=3, course=None): # retrieve the most relevant document chunks from the local ChromaDB vector database; course limits results to one data/ folder
    
     if not isinstance(query, str) or not query.strip():
         raise ValueError("Query cannot be empty.")
@@ -31,6 +31,7 @@ def retrieve_documents(query, top_k=3): # retrieve the most relevant document ch
     results = collection.query(
         query_embeddings=[query_vector],
         n_results=min(top_k, collection.count()),
+        where={"course": course} if course else None,
         include=["documents", "metadatas", "distances"]
     )
 
@@ -45,6 +46,7 @@ def retrieve_documents(query, top_k=3): # retrieve the most relevant document ch
             "id": results["ids"][0][i],
             "text": results["documents"][0][i],
             "source": metadata["source"],
+            "course": metadata.get("course", ""),
             "page": metadata["page"],
             "chunk": metadata["chunk"],
             "similarity": round(1 - distance, 4)

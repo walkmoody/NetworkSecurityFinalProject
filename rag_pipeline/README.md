@@ -84,7 +84,7 @@ After reviewing and approving the documents in `data/`, create the manifest:
 python -c "from rag_pipeline.integrity import create_manifest; create_manifest()"
 ```
 
-This generates `hashes.json` in the repository root.
+This generates `vector_db/hashes.json`. It is stored with the vector database rather than in `data/`, so the approval record is kept apart from the documents it protects.
 
 When adding new documents later, review all current documents before intentionally updating the manifest. The current implementation requires removing the old manifest before creating a replacement.
 
@@ -159,7 +159,7 @@ The retrieval integration tests require a previously built knowledge base contai
 - Course documents are processed locally.
 - Embeddings are generated locally rather than using an external embedding API.
 - SHA-256 verification prevents unapproved or modified documents from being ingested when compared against a trusted manifest.
-- Course documents, `hashes.json`, and `vector_db/` are excluded from Git.
+- Course documents and `vector_db/` (including `vector_db/hashes.json`) are excluded from Git.
 - Retrieved document text must be treated as untrusted content by downstream LLM agents.
 
 **Security limitations:** SHA-256 verification depends on the manifest being protected. The current collection rebuild is not atomic, so an interrupted rebuild may leave the database incomplete. Prompt-injection defenses and end-to-end network privacy verification must be tested during integration.
