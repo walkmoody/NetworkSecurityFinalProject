@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type SubmitEvent } from 'react'
 import { useSearchParams } from 'react-router'
 import ThoughtLine from '../components/ThoughtLine'
 import {
-  classes,
   tutorAnswers,
   tutorFallback,
   tutorSteps,
@@ -22,7 +21,7 @@ const pickAnswer = (question: string) => {
 
 export const Tutor = () => {
   const [searchParams] = useSearchParams()
-  const course = classes.find((c) => c.id === searchParams.get('course')) ?? classes[0]
+  const course = searchParams.get('course') ?? 'your course'
 
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -65,14 +64,13 @@ export const Tutor = () => {
     <div className='mx-auto max-w-4xl px-4 py-8'>
       <div className='flex flex-col h-[calc(100vh-8rem)] rounded-2xl bg-white/80 backdrop-blur border border-slate-200 shadow-sm overflow-hidden'>
         <header className='px-6 py-4 border-b border-slate-200'>
-          <p className='text-sm font-semibold text-blue-600'>{course.code}</p>
-          <h1 className='text-xl font-bold text-slate-900'>{course.name} Tutor</h1>
+          <h1 className='text-xl font-bold text-slate-900'>{course} Tutor</h1>
         </header>
 
         <div className='flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-6'>
           {messages.length === 0 && (
             <div className='m-auto text-center flex flex-col items-center gap-4 max-w-lg'>
-              <h2 className='text-2xl font-bold text-slate-900'>Ask anything about {course.name}</h2>
+              <h2 className='text-2xl font-bold text-slate-900'>Ask anything about {course}</h2>
               <p className='text-slate-600'>Answers come from your course materials and include citations.</p>
               <div className='flex flex-col gap-2 w-full'>
                 {tutorSuggestions.map((s) => (
@@ -130,7 +128,7 @@ export const Tutor = () => {
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={`Ask about ${course.name}…`}
+            placeholder={`Ask about ${course}…`}
             className='flex-1 px-4 py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
           />
           <button

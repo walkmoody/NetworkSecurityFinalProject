@@ -100,6 +100,10 @@ def ingest_documents(chunk_size=500, overlap=50):
     for file_path in documents:
         source = file_path.relative_to(DATA_DIR).as_posix()
 
+        # top-level folder in data/ is the course, e.g. data/CS5342/lecture1.pdf
+        parts = file_path.relative_to(DATA_DIR).parts
+        course = parts[0] if len(parts) > 1 else ""
+
         if file_path.suffix.lower() == ".pdf":
             pages = extract_pdf(file_path)
 
@@ -128,6 +132,7 @@ def ingest_documents(chunk_size=500, overlap=50):
                     "id": chunk_id,
                     "text": text,
                     "source": source,
+                    "course": course,
                     "page": page["page"],
                     "chunk": chunk_number
                 })
