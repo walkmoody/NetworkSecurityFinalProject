@@ -1,6 +1,6 @@
 import { Link } from 'react-router'
 import { ClassCard } from '../components/ClassCard'
-import { classes } from '../assets/assets'
+import { useCourses } from '../utils/courses'
 
 const features = [
   {
@@ -19,6 +19,7 @@ const features = [
 
 export const Home = () => {
   const user = sessionStorage.getItem('user')
+  const { courses, error } = useCourses()
 
   return (
     <div className='mx-auto max-w-6xl px-4 py-10 flex flex-col gap-12'>
@@ -51,10 +52,16 @@ export const Home = () => {
       <section className='flex flex-col gap-4'>
         <h2 className='text-2xl font-bold text-slate-900'>Your classes</h2>
         <div className='grid gap-6 sm:grid-cols-2 lg:grid-cols-3'>
-          {classes.map((c) => (
-            <ClassCard key={c.id} {...c} />
+          {courses?.map((c) => (
+            <ClassCard key={c} id={c} />
           ))}
         </div>
+        {error && <p className='text-sm text-red-700'>{error}</p>}
+        {courses?.length === 0 && (
+          <p className='text-sm text-slate-600'>
+            No courses yet. Add a folder of course files to data/, approve them, and restart ./run.sh.
+          </p>
+        )}
       </section>
     </div>
   )

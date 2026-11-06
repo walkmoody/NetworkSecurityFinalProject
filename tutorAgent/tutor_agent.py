@@ -28,18 +28,18 @@ class TutorError(Exception):
 
 
 class TutorAgent:
-    """Single-course index; other courses require partitioned retrieval."""
+    """Course-scoped tutor; retrieval must be filtered by the supplied course ID."""
     def __init__(self, *, retriever: Callable | None = None, llm_client=None,
                  course_id="CS5342", max_chunks=4, min_similarity=0.25):
-        if course_id != "CS5342":
-            raise ValueError("Only the indexed CS5342 course is supported.")
+        if not isinstance(course_id, str) or not course_id.strip() or len(course_id) > 128:
+            raise ValueError("A valid course_id is required.")
         if type(max_chunks) is not int or not 1 <= max_chunks <= 8:
             raise ValueError("max_chunks must be an integer between 1 and 8.")
         if not isinstance(min_similarity, (int, float)) or not isfinite(min_similarity) or not 0 <= min_similarity <= 1:
             raise ValueError("min_similarity must be between zero and one.")
         if retriever is None:
             from rag_pipeline.retriever import retrieve_documents
-            retriever = retrieve_documents
+            retriever = lambda question, top_k: retrieve_documents(question, top_k=top_k, course=course_id)
         if llm_client is None:
             from .llm_client import create_llm_client
             llm_client = create_llm_client()

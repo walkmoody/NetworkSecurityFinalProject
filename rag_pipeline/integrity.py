@@ -6,7 +6,8 @@ from pathlib import Path
 # project directories
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
-MANIFEST_FILE = BASE_DIR / "hashes.json"
+# kept with the vector database, apart from the untrusted documents in data/
+MANIFEST_FILE = BASE_DIR / "vector_db" / "hashes.json"
 
 SUPPORTED_EXTENSIONS = {".pdf", ".txt"}
 
@@ -53,6 +54,7 @@ def create_manifest(): # create a trusted baseline for approved documents
         hashes[relative_path] = calculate_hash(document)
 
     # does not silently replace an existing trusted baseline.
+    MANIFEST_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(MANIFEST_FILE, "x", encoding="utf-8") as file:
         json.dump(hashes, file, indent=4)
 

@@ -71,7 +71,7 @@ class TutorTests(unittest.TestCase):
 
     def test_invalid_course_configuration(self):
         with self.assertRaises(ValueError):
-            TutorAgent(course_id="OTHER", retriever=lambda **kwargs: [], llm_client=FakeLLM())
+            TutorAgent(course_id="", retriever=lambda **kwargs: [], llm_client=FakeLLM())
 
 
 if __name__ == "__main__":
