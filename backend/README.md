@@ -89,3 +89,13 @@ The tests cover:
 - `test_app.py`: the HTTP API, using the sample corpus and the mock model. It checks the streamed steps and result, sessions and cookies, error statuses, and that model errors don't leak details.
 - `test_tracing.py`: the progress steps, including a rejected first draft and failed calls.
 - `test_pipeline_rag.py`: `PipelineRAG` against a two-course knowledge base built in a temp folder. It checks course isolation, chunk limits and evidence round trips. It needs the embedding model, and is skipped if the model can't be loaded.
+
+## Q&A Tutor integration
+
+The same FastAPI process serves `POST /api/tutor/ask` with:
+`{"course_id": "CS5342", "question": "What is AES?"}`.
+It returns `{"answer": "...", "supported": true, "citations": [...]}`.
+The Tutor reuses the same `OllamaClient` as Quiz and restricts semantic
+retrieval to the requested indexed course. Quiz endpoints remain unchanged.
+Mock mode intentionally returns HTTP 503 for Tutor instead of fabricating answers.
+The app is intended for local demos; browser login is not backend authentication.

@@ -11,7 +11,7 @@ import secrets
 from pathlib import Path
 from threading import Lock
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -23,6 +23,7 @@ from quizAgent.mock_backend import MockBackend
 import rag as rag_package
 from rag import InMemoryRAG
 from rag.contracts import AccessDenied, RAGError
+from tutorAgent import TutorAgent, TutorError
 
 SESSION_COOKIE = "quiz_session"
 MAX_SESSIONS = 1000
@@ -152,3 +153,29 @@ def retry_grading(attempt_id: str, request: Request, response: Response):
         with step("MockBackend.retry_grading — grading your locked answers again"):
             return backend.retry_grading("student", attempt_id)
     return _streamed(work, response)
+
+
+class TutorBody(BaseModel):
+    question: str
+    course_id: str
+
+
+@app.post("/api/tutor/ask")
+def ask_tutor(body: TutorBody):
+    """Use the same runtime and course index as Quiz, without another server."""
+    if body.course_id not in list_courses():
+        raise HTTPException(status_code=403, detail="This course is not in the approved knowledge base.")
+    if use_mock:
+        raise HTTPException(status_code=503, detail="Tutor requires an available local Ollama model.")
+    from rag_pipeline.retriever import retrieve_documents
+
+    tutor = TutorAgent(
+        course_id=body.course_id, llm_client=model,
+        retriever=lambda query, top_k: retrieve_documents(
+            query, top_k=top_k, course=body.course_id
+        ),
+    )
+    try:
+        return tutor.ask(body.question, course_id=body.course_id)
+    except TutorError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
