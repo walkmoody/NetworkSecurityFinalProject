@@ -86,6 +86,21 @@ class TutorTests(unittest.TestCase):
             result = self.make(rows=[], llm=llm).ask("Explain AES", internet_assisted=True)
         self.assertEqual(result["citations"][0]["url"], web["url"])
 
+    def test_internet_lookup_receives_only_the_question(self):
+        from unittest.mock import patch
+        with patch("tutorAgent.tutor_agent.lookup_public_sources", return_value=[]) as lookup:
+            self.make().ask("  AES  ", internet_assisted=True)
+        lookup.assert_called_once_with("AES")
+
+    def test_internet_assisted_falls_back_to_course_material(self):
+        from unittest.mock import patch
+        from tutorAgent.web_lookup import WebLookupUnavailable
+        with patch("tutorAgent.tutor_agent.lookup_public_sources",
+                   side_effect=WebLookupUnavailable("No approved public lookup topic matched this question.")):
+            result = self.make().ask("AES", internet_assisted=True)
+        self.assertTrue(result["supported"])
+        self.assertTrue(all(c.get("source_type") != "web" for c in result["citations"]))
+
     def test_local_only_does_not_call_internet(self):
         from unittest.mock import patch
         with patch("tutorAgent.tutor_agent.lookup_public_sources") as lookup:

@@ -256,7 +256,7 @@ These address the risks in the threat model ([THREAT_MODEL.drawio.png](THREAT_MO
 |---|---|
 | **Prompt injection** | Questions, student answers and retrieved text are passed to the model as data, and the system prompts tell it to ignore instructions inside them. Model output must match a strict JSON schema. Citations are built from retrieval metadata, never from model text. The server, not the model, totals quiz scores and checks each criterion's limit. |
 | **Data exposure (vector database and embeddings)** | The backend and Ollama listen only on `127.0.0.1`. `vector_db/` and `data/` are excluded from Git. Every lookup is filtered to one course. Answer keys never reach the browser. Each browser session gets a random token in an HttpOnly, SameSite=Strict cookie and can see only its own attempts. Model errors are returned without internal details. |
-| **API keys and secrets** | Local inference needs no API keys. `llm/ollama.json` is excluded from Git. The internet lookup is disabled for now (see [Suggestions](#suggestions)). |
+| **API keys and secrets** | Local inference needs no API keys, and the optional Wikipedia lookup uses Wikipedia's public API, which needs none either, so there is no key to store or leak. `llm/ollama.json` is excluded from Git. |
 | **Knowledge base poisoning** | Documents are checked against SHA-256 hashes before indexing, and changed files need explicit approval. The manifest is stored in `vector_db/`, apart from `data/`. Rebuilding the knowledge base invalidates quiz attempts made before the rebuild. |
 
 ## Issues we experienced and solutions
@@ -273,7 +273,7 @@ These address the risks in the threat model ([THREAT_MODEL.drawio.png](THREAT_MO
 
 ## Suggestions
 
-- **Internet citations:** the requirements ask for web references when an answer uses the internet. `tutorAgent/web_lookup.py` is a placeholder that's disabled until a privacy review is done. To enable it safely, send only a short topic query (never course text or student answers), keep any API key in an environment variable, make it opt-in, and keep web text out of quiz scoring.
+- **Internet citations:** the Tutor's opt-in Wikipedia lookup sends a few keywords from the question. A local-only keyword extractor or an on-device paraphrase could send even less. Any future provider that needs an API key should read it from an environment variable, and web text should stay out of quiz scoring.
 - **Real authentication:** the web login is only a front-end screen. Real accounts and backend authorization would be needed before anyone other than the local user could use this.
 - **Encrypt the vector database at rest**, so a copied `vector_db/` folder doesn't expose the course text.
 - **Persistent sessions:** quiz attempts are kept in memory and are lost when the server restarts.
