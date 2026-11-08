@@ -1,4 +1,5 @@
 
+from functools import lru_cache
 from pathlib import Path
 
 import chromadb
@@ -13,18 +14,20 @@ COLLECTION_NAME = "network_security"
 
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
+@lru_cache(maxsize=1)
 def load_embedding_model():
     """
     Load the embedding model using the CPU.
     This avoids PyTorch MPS compatibility issues on macOS.
+
+    Loaded once per process and from the local cache when it is there, so queries make
+    no requests to huggingface.co. Only the first run on a machine downloads the model.
     """
 
-    model = SentenceTransformer(
-        MODEL_NAME,
-        device="cpu"
-    )
-
-    return model
+    try:
+        return SentenceTransformer(MODEL_NAME, device="cpu", local_files_only=True)
+    except OSError:
+        return SentenceTransformer(MODEL_NAME, device="cpu")
 
 
 def get_collection():
