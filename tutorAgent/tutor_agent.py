@@ -4,6 +4,7 @@ from typing import Callable
 from math import isfinite
 from llm.contracts import ModelError
 from .citations import clean_citations
+from .web_lookup import lookup_public_sources, WebLookupUnavailable
 
 SCHEMA = {
     "type": "object", "additionalProperties": False,
@@ -53,9 +54,11 @@ class TutorAgent:
     def unsupported(message):
         return {"answer": message, "citations": [], "supported": False}
 
-    def ask(self, question: str, course_id: str = "CS5342") -> dict:
+    def ask(self, question: str, course_id: str = "CS5342", internet_assisted: bool = False) -> dict:
         if not isinstance(question, str) or not question.strip() or len(question) > 2000:
             raise TutorError("Question must contain 1–2000 characters.")
+        if type(internet_assisted) is not bool:
+            raise TutorError("internet_assisted must be a Boolean.")
         if course_id != self.course_id:
             raise TutorError("Course is not available in this knowledge base.")
         try:
@@ -91,6 +94,11 @@ class TutorAgent:
                 "id": key, "text": passage, "source": source,
                 "page": page, "chunk": chunk, "similarity": score,
             })
+        if internet_assisted:
+            try:
+                evidence.extend(lookup_public_sources(question.strip()))
+            except WebLookupUnavailable as exc:
+                raise TutorError(str(exc)) from exc
         if not evidence:
             return self.unsupported(
                 "I couldn't find sufficiently relevant approved course material to answer that question."

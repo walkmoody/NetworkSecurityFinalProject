@@ -55,3 +55,35 @@ python -m unittest discover -s tests -p test_tutor_agent.py -v
   backend beyond loopback or deploy it for real users without authenticated
   course permissions.
 - In `QUIZ_LLM=mock` mode, the Quiz uses a mock; Tutor returns 503.
+
+
+## Internet-assisted citations (optional / explicit opt-in)
+
+The Q&A Tutor screen has an **Internet-assisted citations** checkbox, initially
+off. When enabled, an HTTPS request retrieves an excerpt from one fixed Wikipedia
+article matching a recognized public security topic, for example AES -> Advanced
+Encryption Standard. Public evidence is supplied to the local Ollama model
+alongside any approved course passages. Citations identify public sources with
+clickable URLs; lecture citations continue to show document and page.
+
+**Privacy boundary:** only a hard-coded public encyclopedia article title and
+fixed MediaWiki query parameters leave the computer. The full student question,
+lecture PDFs, extracted chunks, embedding vectors, model prompts, and course IDs
+are NEVER sent to Wikipedia. The remote provider will still see the requested
+article topic and your IP address. No external API keys are used. Redirects
+are not followed, requests have an 8-second timeout and a 50 KB response cap,
+and unsupported topics or provider failures report an error rather than
+silently sending the prompt to a different service.
+
+To test the network scenario, record actual traffic with the checkbox off
+(loopback 5173 / 8000 / 11434) and then on (also Wikipedia HTTPS). TLS prevents
+reading HTTP request contents directly from an ordinary passive PCAP. Compare
+with the fixed outbound URL logic and offline tests in tests/test_web_lookup.py.
+Do not claim captures have been collected unless they actually have.
+
+Tests from the repository root:
+
+\`\`\`powershell
+python -m unittest discover -s tests -p test_tutor_agent.py -v
+python -m unittest discover -s tests -p test_web_lookup.py -v
+\`\`\`

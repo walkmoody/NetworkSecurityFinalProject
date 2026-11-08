@@ -158,6 +158,7 @@ def retry_grading(attempt_id: str, request: Request, response: Response):
 class TutorBody(BaseModel):
     question: str
     course_id: str
+    internet_assisted: bool = False
 
 
 @app.post("/api/tutor/ask")
@@ -176,6 +177,6 @@ def ask_tutor(body: TutorBody):
         ),
     )
     try:
-        return tutor.ask(body.question, course_id=body.course_id)
+        return tutor.ask(body.question, course_id=body.course_id, internet_assisted=body.internet_assisted)
     except TutorError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
