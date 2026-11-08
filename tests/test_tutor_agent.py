@@ -74,5 +74,24 @@ class TutorTests(unittest.TestCase):
             TutorAgent(course_id="", retriever=lambda **kwargs: [], llm_client=FakeLLM())
 
 
+    def test_internet_assisted_returns_external_citation(self):
+        from unittest.mock import patch
+        web = {"id": "web:wikipedia:AES", "text": "AES is a block cipher.",
+               "source": "Wikipedia: AES", "source_type": "web",
+               "url": "https://en.wikipedia.org/wiki/Advanced_Encryption_Standard",
+               "page": 1, "chunk": 1, "similarity": 1.0}
+        llm = FakeLLM({"answer": "AES is a block cipher.", "supported": True,
+                       "evidence_ids": ["web:wikipedia:AES"]})
+        with patch("tutorAgent.tutor_agent.lookup_public_sources", return_value=[web]):
+            result = self.make(rows=[], llm=llm).ask("Explain AES", internet_assisted=True)
+        self.assertEqual(result["citations"][0]["url"], web["url"])
+
+    def test_local_only_does_not_call_internet(self):
+        from unittest.mock import patch
+        with patch("tutorAgent.tutor_agent.lookup_public_sources") as lookup:
+            self.make().ask("AES")
+            lookup.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
