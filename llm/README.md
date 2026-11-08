@@ -99,5 +99,5 @@ python3 -m quizAgent.demo --timeout 300 --interactive
 
 # Offline demo and tests
 python3 -m quizAgent.demo --mock
-python3 -m unittest discover -s quizAgent/tests -v
+python3 -m pytest tests/test_quiz_agent.py -q
 ```
