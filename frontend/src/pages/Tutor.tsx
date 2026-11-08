@@ -64,7 +64,7 @@ export const Tutor = () => {
           <label className='mt-2 flex items-center gap-2 text-xs text-slate-700'>
             <input type='checkbox' checked={internetAssisted} disabled={busy}
               onChange={e => setInternetAssisted(e.target.checked)} />
-            Internet-assisted citations (fixed public topic sent to Wikipedia; never lecture text)
+            Internet-assisted citations (keywords from your question are searched on Wikipedia; lecture text never leaves this computer)
           </label>
         </header>
         <div className='flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-6'>
