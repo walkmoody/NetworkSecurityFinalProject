@@ -11,3 +11,11 @@ class ValidationError(QuizError):
 
 class AttemptConflict(QuizError):
     pass
+
+
+class AccessDenied(QuizError):
+    pass
+
+
+class EvidenceUnavailable(QuizError):
+    pass

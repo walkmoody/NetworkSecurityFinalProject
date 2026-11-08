@@ -1,14 +1,12 @@
 """HTTP layer between the React frontend and the Quiz Agent.
 
 Run from repository root: uvicorn backend.app:app --host 127.0.0.1 --port 8000
-Set QUIZ_LLM=mock to run without Ollama, and QUIZ_RAG=sample to skip the ChromaDB knowledge base.
+Set QUIZ_LLM=mock to run without Ollama. Quizzes always use the rag_pipeline ChromaDB knowledge base.
 """
 
-import json
 import logging
 import os
 import secrets
-from pathlib import Path
 from threading import Lock
 
 from fastapi import FastAPI, Request, Response, HTTPException
@@ -18,11 +16,9 @@ from pydantic import BaseModel
 from backend.tracing import TracedQuizAgent, step, stream
 from llm import MockLLM, OllamaClient
 from llm.contracts import ModelError
-from quizAgent.errors import AttemptConflict, ValidationError
+from quizAgent.errors import AccessDenied, AttemptConflict, QuizError, ValidationError
 from quizAgent.mock_backend import MockBackend
-import rag as rag_package
-from rag import InMemoryRAG
-from rag.contracts import AccessDenied, RAGError
+from rag_pipeline.embeddings import get_collection
 from tutorAgent import TutorAgent, TutorError
 
 SESSION_COOKIE = "quiz_session"
@@ -32,19 +28,16 @@ log = logging.getLogger("backend")
 use_mock = os.environ.get("QUIZ_LLM", "ollama").lower() == "mock"
 model = MockLLM() if use_mock else OllamaClient()
 
-# QUIZ_RAG=sample uses the built-in fixture corpus instead of the ChromaDB knowledge base.
-if os.environ.get("QUIZ_RAG", "pipeline").lower() == "sample":
-    rag = InMemoryRAG.sample()
-    _sample = json.loads((Path(rag_package.__file__).parent / "data" / "sample_corpus.json").read_text())
-    _sample_courses = sorted({e["course_id"] for e in _sample["evidence"]})
-    list_courses = lambda: _sample_courses
-else:
-    from backend.pipeline_rag import PipelineRAG
-    rag = PipelineRAG()
-    # Courses are the folders in data/ that have been indexed by rag_pipeline.build_index.
-    list_courses = PipelineRAG.courses
-# Reports each RAG, model, and agent call while a request runs (see backend/tracing.py).
-agent = TracedQuizAgent(rag, model)
+
+
+def list_courses() -> list[str]:
+    """Course folders in data/ that rag_pipeline.build_index has indexed."""
+    metadatas = get_collection().get(include=["metadatas"])["metadatas"]
+    return sorted({m["course"] for m in metadatas if m.get("course")})
+
+
+# Reports each rag_pipeline, model, and agent call while a request runs (see backend/tracing.py).
+agent = TracedQuizAgent(model)
 
 # One MockBackend per browser session keeps attempts isolated between users.
 # The user ID inside each backend is fixed server-side, never taken from the client.
@@ -74,8 +67,10 @@ def _error(exc: Exception) -> tuple[int, str]:
         return 400, str(exc)
     if isinstance(exc, AttemptConflict):
         return 409, str(exc)
-    if isinstance(exc, RAGError):
-        return (403 if isinstance(exc, AccessDenied) else 422), str(exc)
+    if isinstance(exc, AccessDenied):
+        return 403, str(exc)
+    if isinstance(exc, QuizError):  # EvidenceUnavailable and other quiz workflow failures
+        return 422, str(exc)
     if isinstance(exc, ModelError):
         log.warning("Model error: %s", exc)
         return 502, "The local model is unavailable or returned an invalid response."
@@ -88,7 +83,7 @@ def _error_response(_, exc):
     return JSONResponse({"detail": detail}, status_code=status)
 
 
-for _exc_type in (ValidationError, AttemptConflict, RAGError, ModelError, Exception):
+for _exc_type in (QuizError, ModelError, Exception):
     app.add_exception_handler(_exc_type, _error_response)
 
 
@@ -173,7 +168,7 @@ def ask_tutor(body: TutorBody):
     tutor = TutorAgent(
         course_id=body.course_id, llm_client=model,
         retriever=lambda query, top_k: retrieve_documents(
-            query, top_k=top_k, course=body.course_id
+            query, top_k=top_k, course=body.course_id, expand_titles=True
         ),
     )
     try:

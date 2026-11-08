@@ -49,7 +49,7 @@ fi
 # they are indexed. If files are new, modified, or missing since the last approval, list them
 # and ask. Declining keeps the previously approved knowledge base and starts the app anyway.
 MANIFEST=vector_db/hashes.json  # matches MANIFEST_FILE in rag_pipeline/integrity.py
-if [[ "${QUIZ_RAG:-pipeline}" != "sample" ]]; then
+if true; then  # quizzes always use the knowledge base
   approved=1
   if [[ -f "$MANIFEST" ]]; then
     changes=$(backend/.venv/bin/python -m rag_pipeline.integrity | grep -E '^\[(UNAPPROVED|MODIFIED|MISSING)\]' || true)

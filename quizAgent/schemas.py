@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from copy import deepcopy
 
-from rag.contracts import AuthorizedScope
 from .errors import ValidationError
 
 QUESTION_TYPES = ("multiple_choice", "true_false", "open_ended")
@@ -16,12 +15,10 @@ class GenerateQuizRequest:
     mode: str
     topic_id: str | None
     question_counts: dict[str, int]
-    authorized_scope: AuthorizedScope
 
     def validate(self) -> None:
         if not isinstance(self.course_id, str) or not self.course_id.strip():
             raise ValidationError("course_id is required.")
-        self.authorized_scope.require(self.course_id)
         if self.mode not in ("random", "topic"):
             raise ValidationError("mode must be random or topic.")
         if self.mode == "topic" and (not isinstance(self.topic_id, str)
@@ -46,7 +43,6 @@ class GradeQuizRequest:
     corpus_version: str
     questions: list[dict]  # Private questions loaded by the backend, with authoritative IDs.
     answers: dict
-    authorized_scope: AuthorizedScope
 
 
 def object_schema(properties: dict) -> dict:

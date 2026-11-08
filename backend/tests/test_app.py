@@ -1,4 +1,4 @@
-"""HTTP API tests against the sample corpus and the mock model (no Ollama, no ChromaDB)."""
+"""HTTP API tests through rag_pipeline against a throwaway Chroma collection and the mock model (no Ollama)."""
 
 import os
 import unittest
@@ -6,19 +6,21 @@ from unittest.mock import patch
 
 # backend.app reads these at import time.
 os.environ["QUIZ_LLM"] = "mock"
-os.environ["QUIZ_RAG"] = "sample"
 
 from fastapi.testclient import TestClient  # noqa: E402
 
 import backend.app as app_module  # noqa: E402
 from llm.contracts import ModelError  # noqa: E402
-from .helpers import answers_for, events, final  # noqa: E402
+from .helpers import answers_for, events, final, knowledge_base  # noqa: E402
 
 COUNTS = {"multiple_choice": 3, "true_false": 2, "open_ended": 1}
 
 
 class ApiTests(unittest.TestCase):
     def setUp(self):
+        self.kb = knowledge_base()
+        self.kb.__enter__()
+        self.addCleanup(self.kb.__exit__, None, None, None)
         # Each client keeps its own cookies, so each test starts a new session.
         self.client = TestClient(app_module.app)
 
@@ -55,7 +57,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(started, finished)
         texts = " | ".join(e["text"] for e in steps)
         for call in ("MockBackend.create_quiz", "QuizAgent.generate_quiz(mode=topic, topic=firewall)",
-                     "InMemoryRAG.retrieve_quiz_evidence", "generate_structured(task=quiz_generation)",
+                     "rag_pipeline.retrieve_documents", "generate_structured(task=quiz_generation)",
                      "validate_draft", "passed"):
             self.assertIn(call, texts)
         quiz = last["data"]
