@@ -1,8 +1,9 @@
 """Live progress for quiz requests.
 
-Wraps the agent's RAG and LLM clients (and QuizAgent itself) so every call is reported
-as a step while it runs, then streams those steps to the browser as NDJSON.
-quizAgent is unchanged; it only sees clients with the same methods.
+Wraps the LLM client, QuizAgent itself, and the rag_pipeline lookups quizAgent makes
+(retrieve_documents, get_evidence_by_ids) so every call is reported as a step while it
+runs, then streams those steps to the browser as NDJSON. Without a reporter the wrappers
+just pass through.
 """
 
 import contextvars
@@ -13,6 +14,9 @@ import time
 
 from fastapi.responses import StreamingResponse
 
+import quizAgent.generation
+import quizAgent.grading
+import quizAgent.mock_backend
 from quizAgent import QuizAgent
 
 _reporter = contextvars.ContextVar("reporter", default=None)
@@ -67,41 +71,46 @@ def _close_validation(outcome: str) -> None:
         reporter.finish(step_id, f"{text} — {outcome}")
 
 
-def _evidence_summary(bundle) -> str:
-    documents = {e.document_id for e in bundle.evidence}
-    return f"{len(bundle.evidence)} chunks from {len(documents)} document{'s' if len(documents) != 1 else ''}"
+def _evidence_summary(items) -> str:
+    documents = {e.get("document_id") or e.get("source") for e in items}
+    return f"{len(items)} chunks from {len(documents)} document{'s' if len(documents) != 1 else ''}"
 
 
-class TracedRAG:
-    def __init__(self, inner):
-        self._inner = inner
-        self._name = type(inner).__name__
+def _traced_retrieve(inner):
+    def retrieve_documents(query, top_k=5, course=None):
+        with step(f"rag_pipeline.retrieve_documents — searching course materials ('{query}', top {top_k})") as s:
+            documents = inner(query, top_k=top_k, course=course)
+            s.result = _evidence_summary(documents)
+        return documents
+    retrieve_documents.__wrapped__ = inner
+    return retrieve_documents
 
-    def __getattr__(self, name):
-        return getattr(self._inner, name)
 
-    def retrieve_quiz_evidence(self, **kwargs):
-        what = f"topic '{kwargs['topic_id']}'" if kwargs.get("topic_id") else "random sample"
-        with step(f"{self._name}.retrieve_quiz_evidence — searching course materials ({what})") as s:
-            bundle = self._inner.retrieve_quiz_evidence(**kwargs)
-            s.result = _evidence_summary(bundle)
-        return bundle
-
-    def retrieve(self, **kwargs):
-        with step(f"{self._name}.retrieve — searching course materials") as s:
-            bundle = self._inner.retrieve(**kwargs)
-            s.result = _evidence_summary(bundle)
-        return bundle
-
-    def get_evidence_by_ids(self, evidence_ids, corpus_version, authorized_scope):
+def _traced_lookup(inner):
+    def get_evidence_by_ids(evidence_ids, version, course_id):
         # Called once by grading (to check against the source) and once afterwards for citations.
         reporter = _reporter.get()
         purpose = ("loading the original evidence for grading" if reporter and reporter.grading
                    else "attaching citations to your results")
-        with step(f"{self._name}.get_evidence_by_ids — {purpose} ({len(set(evidence_ids))} chunks)") as s:
-            bundle = self._inner.get_evidence_by_ids(evidence_ids, corpus_version, authorized_scope)
-            s.result = _evidence_summary(bundle)
-        return bundle
+        with step(f"rag_pipeline get_evidence_by_ids — {purpose} ({len(set(evidence_ids))} chunks)") as s:
+            evidence = inner(evidence_ids, version, course_id)
+            s.result = _evidence_summary(evidence)
+        return evidence
+    get_evidence_by_ids.__wrapped__ = inner
+    return get_evidence_by_ids
+
+
+def _install_retrieval_tracing():
+    """quizAgent imports these functions by name, so wrap them where they are looked up."""
+    for module, name, wrap in ((quizAgent.generation, "retrieve_documents", _traced_retrieve),
+                               (quizAgent.grading, "get_evidence_by_ids", _traced_lookup),
+                               (quizAgent.mock_backend, "get_evidence_by_ids", _traced_lookup)):
+        current = getattr(module, name)
+        if not hasattr(current, "__wrapped__"):
+            setattr(module, name, wrap(current))
+
+
+_install_retrieval_tracing()
 
 
 class TracedLLM:
@@ -128,8 +137,8 @@ class TracedLLM:
 
 
 class TracedQuizAgent(QuizAgent):
-    def __init__(self, rag_client, llm_client):
-        super().__init__(TracedRAG(rag_client), TracedLLM(llm_client))
+    def __init__(self, llm_client):
+        super().__init__(TracedLLM(llm_client))
 
     def generate_quiz(self, request):
         topic = f", topic={request.topic_id}" if request.topic_id else ""
