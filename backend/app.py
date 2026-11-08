@@ -167,7 +167,7 @@ def ask_tutor(body: TutorBody):
     tutor = TutorAgent(
         course_id=body.course_id, llm_client=model,
         retriever=lambda query, top_k: retrieve_documents(
-            query, top_k=top_k, course=body.course_id
+            query, top_k=top_k, course=body.course_id, expand_titles=True
         ),
     )
     try:

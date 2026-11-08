@@ -228,7 +228,7 @@ export const Quiz = () => {
                     <p className='mt-1 whitespace-pre-line'>{graded.feedback}</p>
                     {graded.citations.map((c) => (
                       <p key={c.chunk_id} className='mt-2 text-xs opacity-75'>
-                        📄{' '}
+                        {' '}
                         {c.source_url ? (
                           <a href={c.source_url} target='_blank' rel='noreferrer' className='underline'>
                             {c.title}

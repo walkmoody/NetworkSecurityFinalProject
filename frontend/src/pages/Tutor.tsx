@@ -64,7 +64,7 @@ export const Tutor = () => {
         <div className='flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-6'>
           {messages.length === 0 && (
             <div className='m-auto text-center flex flex-col items-center gap-4 max-w-lg'>
-              <h2 className='text-2xl font-bold text-slate-900'>Ask anything about {course.name}</h2>
+              <h2 className='text-2xl font-bold text-slate-900'>Ask anything about {course || 'your course'}</h2>
               <p className='text-slate-600'>Answers use course materials and include source citations.</p>
               <div className='flex flex-col gap-2 w-full'>
                 {tutorSuggestions.map(s => (
@@ -86,7 +86,7 @@ export const Tutor = () => {
                     <div className='mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-2'>
                       {m.citations.map(c => (
                         <span key={c.id} className='px-2 py-1 rounded-md bg-slate-100 text-xs text-slate-600'>
-                          📄 {c.source} · {c.section}
+                          {c.source} · {c.section}
                         </span>
                       ))}
                     </div>

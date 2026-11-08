@@ -39,7 +39,8 @@ class TutorAgent:
             raise ValueError("min_similarity must be between zero and one.")
         if retriever is None:
             from rag_pipeline.retriever import retrieve_documents
-            retriever = lambda question, top_k: retrieve_documents(question, top_k=top_k, course=course_id)
+            retriever = lambda question, top_k: retrieve_documents(
+                question, top_k=top_k, course=course_id, expand_titles=True)
         if llm_client is None:
             from .llm_client import create_llm_client
             llm_client = create_llm_client()

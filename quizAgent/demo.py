@@ -18,7 +18,7 @@ def main():
     parser.add_argument("--config", help="Ollama JSON settings file (OLLAMA_CONFIG; default: llm/ollama.json)")
     inspection = parser.add_mutually_exclusive_group()
     inspection.add_argument("--show-config", action="store_true", help="Print resolved Ollama settings without connecting")
-    parser.add_argument("--model", help="Ollama model (OLLAMA_MODEL; default: qwen3.5:9b)")
+    parser.add_argument("--model", help="Ollama model (OLLAMA_MODEL; default: the model in llm/ollama.json)")
     parser.add_argument("--ollama-url", help="Host URL including port (OLLAMA_BASE_URL; default: http://127.0.0.1:11434)")
     parser.add_argument("--timeout", type=float, help="Ollama timeout in seconds (OLLAMA_TIMEOUT; default: 120)")
     inspection.add_argument("--check-connection", action="store_true", help="Check host connectivity and model installation, then exit")

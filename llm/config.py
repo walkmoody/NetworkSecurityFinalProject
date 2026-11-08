@@ -46,7 +46,7 @@ class OllamaSettings:
     # host describes the server binding; it never replaces the client destination.
     host: str = "127.0.0.1:11434"
     base_url: str = "http://127.0.0.1:11434"
-    model: str = "qwen3.5:9b"
+    model: str = ""  # no built-in model: set it in llm/ollama.json, OLLAMA_MODEL, or --model
     timeout: float = 120
     temperature: float = 0
     num_predict: int = 4096
@@ -65,7 +65,9 @@ class OllamaSettings:
         except ValueError as exc:
             raise ValueError("host must be a server bind address with a valid port, e.g. 0.0.0.0:11434.") from exc
         if not isinstance(self.model, str) or not self.model.strip():
-            raise ValueError("model must be a nonempty Ollama model name.")
+            raise ValueError(
+                "No Ollama model is set. Add \"model\" to llm/ollama.json, or set OLLAMA_MODEL."
+            )
         object.__setattr__(self, "base_url", validate_base_url(self.base_url))
         object.__setattr__(self, "model", self.model.strip())
         timeout = _number(self.timeout, "timeout", 0, 1800)

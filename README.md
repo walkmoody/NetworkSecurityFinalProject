@@ -263,6 +263,7 @@ These address the risks in the threat model ([THREAT_MODEL.drawio.png](THREAT_MO
 
 | Issue | Solution |
 |---|---|
+| Tutor questions about a topic (for example "the three core security requirements") returned "not enough evidence". Title-only slides matched the question best, so they filled the top results while the slides with the definitions ranked below 20th. | For Tutor queries, the retriever now extends a matched title slide with the slides that follow it (up to about 120 words or 4 slides). A citation to a title slide therefore covers that short section. The Quiz Agent keeps the stored chunks, because grading re-reads them. |
 | The embedding model crashed with PyTorch MPS errors on Apple Silicon Macs. | It is forced to run on the CPU in [rag_pipeline/embeddings.py](rag_pipeline/embeddings.py). `all-MiniLM-L6-v2` is small enough that this is fast. |
 | The Quiz Agent was first built against a sample corpus (`rag/`), separate from the team's real RAG pipeline, so the two drifted apart. | We removed `rag/` and changed the Quiz Agent to read directly from `rag_pipeline` (PR #6), so both agents use the same index. |
 | Moving the slides into per-course folders changed their paths, so the existing hash manifest no longer matched. | `run.sh` lists the differences and asks for approval, then rebuilds. Re-approving is a deliberate step, never automatic. |
