@@ -9,25 +9,22 @@ Structure
 ```text
 backend/
 ├── app.py            # HTTP endpoints, sessions, and error mapping
-├── pipeline_rag.py   # Connects quizAgent to the ChromaDB knowledge base in rag_pipeline/
-├── tracing.py        # Reports each RAG, model, and agent call live while a quiz request runs
+├── tracing.py        # Reports each rag_pipeline, model, and agent call live while a quiz request runs
 └── requirements.txt  # fastapi, uvicorn, plus the root requirements.txt
 ```
 
 Flow
 
 ```text
-React (Vite :5173) → /api proxy → FastAPI (:8000) → MockBackend → QuizAgent → PipelineRAG (ChromaDB) + Ollama
+React (Vite :5173) → /api proxy → FastAPI (:8000) → MockBackend → QuizAgent → rag_pipeline (ChromaDB) + Ollama
 ```
 
-`PipelineRAG` connects quizAgent to the knowledge base that `python -m rag_pipeline.build_index` builds. Each top-level folder in `data/` is a course, and nothing is hard-coded. A session can use the courses that were indexed when it started, so restart the server after adding a course.
+quizAgent reads the knowledge base that `python -m rag_pipeline.build_index` builds, through `rag_pipeline.retriever` (generation) and `quizAgent/evidence.py` (original evidence for grading and citations). Each top-level folder in `data/` is a course, and nothing is hard-coded. A session can use the courses that were indexed when it started, so restart the server after adding a course.
 - **Course isolation:** every lookup is limited to the requested course's chunks.
-- **Random mode:** picks random chunks from the knowledge base.
+- **Random mode:** a semantic search for the course's key concepts.
 - **Topic mode:** runs a semantic search on the topic name.
 - **Citations:** show the document's filename and page.
 - **Corpus version:** comes from `vector_db/hashes.json`, so rebuilding the knowledge base invalidates quiz attempts made before the rebuild.
-
-Set `QUIZ_RAG=sample` to use the built-in sample corpus instead.
 
 Each browser gets a random session token in an HttpOnly, SameSite=Strict cookie.
 Each session has its own attempt store, so one user can't read or submit another
@@ -47,8 +44,8 @@ Endpoints
 The three quiz endpoints stream newline-delimited JSON (`application/x-ndjson`) so the page can show each call as it happens:
 
 ```text
-{"type": "step", "id": 3, "text": "PipelineRAG.retrieve_quiz_evidence — …"}
-{"type": "step", "id": 3, "text": "PipelineRAG.retrieve_quiz_evidence — … — 6 chunks from 3 documents (0.4s)", "done": true}
+{"type": "step", "id": 3, "text": "rag_pipeline.retrieve_documents — …"}
+{"type": "step", "id": 3, "text": "rag_pipeline.retrieve_documents — … — 12 chunks from 3 documents (0.4s)", "done": true}
 {"type": "result", "data": {...}}        or        {"type": "error", "status": 409, "detail": "..."}
 ```
 
@@ -86,9 +83,8 @@ backend/.venv/bin/python -m unittest discover -s backend/tests -t . -v
 ```
 
 The tests cover:
-- `test_app.py`: the HTTP API, using the sample corpus and the mock model. It checks the streamed steps and result, sessions and cookies, error statuses, and that model errors don't leak details.
+- `test_app.py`: the HTTP API through rag_pipeline, using a throwaway in-memory Chroma collection (`helpers.knowledge_base`) and the mock model. It checks the streamed steps and result, sessions and cookies, error statuses, and that model errors don't leak details.
 - `test_tracing.py`: the progress steps, including a rejected first draft and failed calls.
-- `test_pipeline_rag.py`: `PipelineRAG` against a two-course knowledge base built in a temp folder. It checks course isolation, chunk limits and evidence round trips. It needs the embedding model, and is skipped if the model can't be loaded.
 
 ## Q&A Tutor integration
 

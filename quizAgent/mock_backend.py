@@ -1,4 +1,7 @@
-"""In-process backend stand-in. No HTTP server, real authentication, or persistence.
+"""In-process simulation of backend.app's quiz workflow and response bodies.
+
+Create one instance per session with server-selected course memberships, as the
+HTTP backend does. Attempts, locked answers, retries, and citations stay in memory.
 
 Callers supply a user ID to simulate an already authenticated session. Never expose
 that parameter as an authentication mechanism in a real API.
@@ -11,8 +14,8 @@ from uuid import uuid4
 
 from quizAgent.schemas import GenerateQuizRequest, GradeQuizRequest
 from quizAgent.validation import validate_answers, validate_open_grade
-from rag.contracts import AccessDenied, AuthorizedScope
-from .errors import AttemptConflict, ValidationError
+from .evidence import get_evidence_by_ids
+from .errors import AccessDenied, AttemptConflict, ValidationError
 
 
 @dataclass
@@ -32,7 +35,7 @@ class MockBackend:
         memberships = users if users is not None else {
             "alice": ("CS5342",), "bob": ("CS5342",), "outsider": (),
         }
-        self._users = {user: AuthorizedScope(tuple(courses)) for user, courses in memberships.items()}
+        self._users = {user: tuple(courses) for user, courses in memberships.items()}
         self._attempts: dict[str, _Attempt] = {}
         self._lock = RLock()
 
@@ -46,7 +49,8 @@ class MockBackend:
         attempt = self._attempts.get(attempt_id)
         if attempt is None or attempt.owner_id != user_id:
             raise AccessDenied("Attempt is unavailable to this user.")
-        scope.require(attempt.course_id)
+        if attempt.course_id not in scope:
+            raise AccessDenied("Course is unavailable to this user.")
         return attempt
 
     def create_quiz(self, user_id: str, payload: dict) -> dict:
@@ -58,9 +62,11 @@ class MockBackend:
             raise ValidationError("Missing generation settings.")
         request = GenerateQuizRequest(
             payload["course_id"], payload["mode"], payload.get("topic_id"),
-            deepcopy(payload["question_counts"]), scope,
+            deepcopy(payload["question_counts"]),
         )
         request.validate()
+        if request.course_id not in scope:
+            raise AccessDenied("Course is unavailable to this user.")
         with self._lock:
             if len(self._attempts) >= 100:
                 raise AttemptConflict("Mock storage is full; restart the demo to clear it.")
@@ -110,21 +116,18 @@ class MockBackend:
             request = GradeQuizRequest(
                 attempt_id, attempt.course_id, attempt.draft["corpus_version"],
                 deepcopy(attempt.draft["questions"]), deepcopy(attempt.answers),
-                self._scope(attempt.owner_id),
             )
             grade = self.agent.grade_quiz(request)
             self._validate_grade(attempt_id, attempt, grade)
             evidence_ids = list(dict.fromkeys(
                 eid for q in attempt.draft["questions"] for eid in q["answer_key"]["evidence_ids"]
             ))
-            bundle = self.agent.rag.get_evidence_by_ids(
-                evidence_ids, attempt.draft["corpus_version"], request.authorized_scope,
+            evidence = get_evidence_by_ids(
+                evidence_ids, attempt.draft["corpus_version"], request.course_id,
             )
-            citations = {e.chunk_id: {
-                "chunk_id": e.chunk_id, "document_id": e.document_id,
-                "document_version": e.document_version, "title": e.title,
-                "page": e.page, "source_type": e.source_type, "source_url": e.source_url,
-            } for e in bundle.evidence}
+            citations = {e["chunk_id"]: {key: e[key] for key in (
+                "chunk_id", "document_id", "document_version", "title", "page", "source_type", "source_url",
+            )} for e in evidence}
             result = {
                 "attempt_id": attempt_id, "status": "graded",
                 "points_awarded": sum(r["points_awarded"] for r in grade["results"]),

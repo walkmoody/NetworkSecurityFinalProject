@@ -28,7 +28,6 @@ From the repository root:
 ```bash
 ./run.sh                          # Use the local Ollama model
 ./run.sh --mock                   # Use the mock model; no Ollama needed
-QUIZ_RAG=sample ./run.sh --mock   # Also skip the knowledge base; use the built-in sample corpus
 ```
 
 Then open http://localhost:5173. Press Ctrl+C to stop both the backend and the frontend.

@@ -50,7 +50,7 @@ def validate_draft(draft: dict, request, evidence) -> None:
     counts = Counter(q["type"] for q in draft["questions"])
     if counts != Counter({k: v for k, v in request.question_counts.items() if v}):
         raise ValidationError("Generated question counts do not match the request.")
-    available = {e.chunk_id for e in evidence}
+    available = {e["chunk_id"] for e in evidence}
     texts = set()
     for q in draft["questions"]:
         normalized = " ".join(q["text"].lower().split())
