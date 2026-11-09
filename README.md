@@ -289,5 +289,8 @@ These address the risks in the threat model ([THREAT_MODEL.drawio.png](THREAT_MO
 
 ## Feedback
 
-_To be completed by the team: what worked well in the project, what was hard,
-and any suggestions for the course or the assignment._
+**What worked well.** Building one shared RAG pipeline for both agents kept the Tutor and the Quiz Agent consistent and let us fix retrieval in one place. The security tasks were more than a checkbox: our first Wireshark capture showed the backend contacting huggingface.co on every question, which we traced to the embedding model being reloaded per query and fixed. Strict JSON schemas, server-built citations and the SHA-256 approval step caught bad model output and changed documents before they reached a student.
+
+**What was hard.** Local models force a trade-off between speed and quality: `qwen3.5:9b` was too slow on some of our laptops, so some members tested with the smaller `gemma4:e2b`. Lecture slides also make awkward retrieval data, since title-only slides outranked the slides with the actual content until we changed how they are retrieved. Adding Internet-assisted citations without sending course content meant deciding exactly what may leave the machine, and proving it with decrypted captures. Coordinating five people's work across branches took steady integration testing.
+
+**Suggestions for the course.** A shared set of sample questions with reference answers would let teams measure answer and grading accuracy the same way. Clearer guidance on the Internet-assisted scenario, such as what may be sent and how to show it, for example by logging TLS keys, would help teams plan the capture earlier.
