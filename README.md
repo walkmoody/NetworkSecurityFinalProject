@@ -10,8 +10,13 @@ your course documents:
 Everything runs on your own machine: the LLM (Ollama), the embedding model, the
 vector database (ChromaDB) and the web app. Course documents never leave the computer.
 
+## Demo
+
+https://github.com/user-attachments/assets/0589eb7b-5173-4e0f-9ea8-8c1732d219f5
+
 ## Contents
 
+- [Demo](#demo)
 - [Features](#features)
 - [System architecture](#system-architecture)
 - [Required environment](#required-environment)
@@ -57,7 +62,9 @@ vector database (ChromaDB) and the web app. Course documents never leave the com
                         └───────────────────────────────────────────────────────────────────────┘
 ```
 
-The threat model diagram is in [THREAT_MODEL.drawio.png](THREAT_MODEL.drawio.png).
+### Threat model
+
+![Threat model diagram](THREAT_MODEL.drawio.png)
 
 ### Repository layout
 
@@ -127,8 +134,6 @@ pretrained model gets the relevant course text inside each prompt.
 
 The course documents and the built database aren't committed to Git. Each team
 member adds the slides to `data/` locally.
-
-https://github.com/user-attachments/assets/0589eb7b-5173-4e0f-9ea8-8c1732d219f5
 
 ## Flow of execution
 

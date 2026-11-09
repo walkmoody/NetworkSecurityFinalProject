@@ -19,3 +19,4 @@ vector_db/
 
 # Mac system files
 .DS_Store
+/PromptRequests
