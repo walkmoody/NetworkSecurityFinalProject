@@ -128,6 +128,8 @@ pretrained model gets the relevant course text inside each prompt.
 The course documents and the built database aren't committed to Git. Each team
 member adds the slides to `data/` locally.
 
+https://github.com/user-attachments/assets/0589eb7b-5173-4e0f-9ea8-8c1732d219f5
+
 ## Flow of execution
 
 ### 1. Building the knowledge base (at startup, when needed)
