@@ -2,6 +2,8 @@ Quiz Agent
 
 Generates and grades random or topic-specific quizzes using `rag_pipeline` and
 the shared LLM client. Supports multiple-choice, true/false, and open-ended questions.
+Random mode retrieves course key concepts through semantic search; it does not
+randomly sample documents.
 
 Structure
 
@@ -50,11 +52,17 @@ the backend, for example `MockBackend(QuizAgent(model), {"student": ("NetworkSec
 Use `create_quiz`, `submit_answers`, and `retry_grading` with that server-selected
 user ID. Public quizzes omit answer keys; grading uses the original chunk IDs and
 manifest version. Storage is in memory, and user IDs simulate authentication.
+Failed grading marks the attempt `review_required`; retries reuse the locked
+submitted answers. A changed manifest or missing original chunks prevents grading
+existing attempts. For HTTP integration, see the [backend README](../backend/README.md).
 
 Commands
 
 Use Python 3.10+ and run from the repository root. On Windows, replace `python3`
 with `py -3`. First follow the [Ollama configuration instructions](../llm/README.md).
+Install dependencies, create the approved-document manifest, and build the index
+using the [RAG pipeline setup instructions](../rag_pipeline/README.md#installation).
+`--mock` skips Ollama but still uses the index and embedding model.
 
 ```bash
 # Take a quiz using the configured Ollama model
@@ -63,6 +71,10 @@ python3 -m quizAgent.demo --interactive --course NetworkSecurity --topic firewal
 
 # Run without Ollama
 python3 -m quizAgent.demo --mock
+
+# Inspect Ollama settings or check connectivity
+python3 -m quizAgent.demo --show-config
+python3 -m quizAgent.demo --check-connection
 
 # Run tests
 python3 -m pytest tests/test_quiz_agent.py -q
